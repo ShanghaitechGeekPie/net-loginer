@@ -6,6 +6,9 @@ use std::net::{IpAddr, Ipv4Addr};
 use once_cell::sync::Lazy;
 
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
+
+const VERIFY_CODE_LENGTH: usize = 4;
+const CLASSIFICATION_MAX_RETRY: usize = 3;
 const NET_AUTH_BASEURL: &str = "https://net-auth.shanghaitech.edu.cn:19008";
 
 pub struct Authenticator {
@@ -74,16 +77,22 @@ impl Authenticator {
 
 impl Authenticator {
     async fn get_verify_code(&self, ip_address: Ipv4Addr) -> Result<String, Box<dyn Error>> {
-        let image_url = format!(
-            "{}/portalauth/verificationcode?uaddress={}",
-            NET_AUTH_BASEURL, ip_address
-        );
-
-        let image = CLIENT.get(&image_url).send().await?.bytes().await?;
-        let verify_code = ddddocr::ddddocr_classification_old()?.classification(&image)?;
-        log::info!("Verify code: {}", verify_code);
-
-        Ok(verify_code)
+        for _ in 0..CLASSIFICATION_MAX_RETRY {
+            let image_url = format!(
+                "{}/portalauth/verificationcode?uaddress={}",
+                NET_AUTH_BASEURL, ip_address
+            );
+    
+            let image = CLIENT.get(&image_url).send().await?.bytes().await?;
+            let verify_code = ddddocr::ddddocr_classification_old()?.classification(&image)?;
+    
+            if verify_code.len() == VERIFY_CODE_LENGTH {
+                log::info!("Verify code: {}", verify_code);
+                return Ok(verify_code);
+            }
+        }
+    
+        Err("Failed to get a verify code with length 4 after 3 attempts".into())
     }
 
     async fn get_page_params(
