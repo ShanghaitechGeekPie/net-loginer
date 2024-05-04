@@ -16,13 +16,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let user_id = env::var("EGATE_ID")?;
     let password = env::var("EGATE_PASSWORD")?;
-    let interface = env::var("INTERFACE")?;
 
     log::info!("User ID: {}", user_id);
     log::info!("Password: {}", password);
-    log::info!("Interface: {}", interface);
 
-    let mut authenticator = Authenticator::new(user_id, password, interface)?;
+    let mut authenticator = Authenticator::new(user_id, password)?;
     authenticator.perform_login().await?;
     log::info!("Successfully logged in!");
 

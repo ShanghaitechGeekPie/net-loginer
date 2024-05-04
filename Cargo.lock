@@ -1515,6 +1515,7 @@ dependencies = [
  "ddddocr",
  "dotenv",
  "log",
+ "once_cell",
  "pnet",
  "reqwest 0.12.4",
  "serde_json",
