@@ -20,9 +20,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     log::info!("User ID: {}", user_id);
     log::info!("Password: {}", password);
 
-    let mut authenticator = Authenticator::new(user_id, password)?;
+    let authenticator = Authenticator::new(user_id, password)?;
     authenticator.perform_login().await?;
-    log::info!("Successfully logged in!");
 
     Ok(())
 }

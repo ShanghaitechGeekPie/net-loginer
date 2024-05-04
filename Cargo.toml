@@ -15,6 +15,7 @@ get_if_addrs = "0.5.3"
 log = "0.4.21"
 once_cell = "1.19.0"
 serde_json = "1.0.116"
+thiserror = "1.0.59"
 
 [dependencies.tokio]
 version = "1.37.0"
@@ -22,7 +23,8 @@ features = ["macros", "rt-multi-thread"]
 
 [dependencies.reqwest]
 version = "0.12.4"
-features = ["json"]
+features = ["default-tls", "json"]
+default-features = false
 
 [dependencies.simple_logger]
 version = "5.0.0"
