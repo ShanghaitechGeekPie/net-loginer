@@ -4,7 +4,7 @@
 
 ## 使用
 
-复制 `.env` 并编辑：
+复制 `.env.example` 到 `.env` 并编辑：
 
 ```bash
 cp .env.example .env

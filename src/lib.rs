@@ -1,9 +1,9 @@
-use pnet::datalink;
+use get_if_addrs::{get_if_addrs, IfAddr};
+use once_cell::sync::Lazy;
 use reqwest::Client;
 use std::collections::HashMap;
 use std::error::Error;
-use std::net::{IpAddr, Ipv4Addr};
-use once_cell::sync::Lazy;
+use std::net::Ipv4Addr;
 
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 
@@ -19,15 +19,13 @@ pub struct Authenticator {
 
 impl Authenticator {
     pub fn new(user_id: String, password: String) -> Result<Self, Box<dyn Error>> {
-        let ip_addresses = datalink::interfaces()
+        let ip_addresses: Vec<Ipv4Addr> = get_if_addrs()?
             .into_iter()
-            .filter(|iface| iface.is_up() && !iface.is_loopback())
-            .flat_map(|iface| iface.ips)
-            .filter_map(|ip| match ip.ip() {
-                IpAddr::V4(ipv4) if ipv4.octets()[0] == 10 => Some(ipv4),
+            .filter_map(|if_addr| match if_addr.addr {
+                IfAddr::V4(ipv4) if ipv4.ip.octets()[0] == 10 => Some(ipv4.ip),
                 _ => None,
             })
-            .collect::<Vec<Ipv4Addr>>();
+            .collect();
 
         log::info!("IP addresses: {:?}", ip_addresses);
 
@@ -82,16 +80,16 @@ impl Authenticator {
                 "{}/portalauth/verificationcode?uaddress={}",
                 NET_AUTH_BASEURL, ip_address
             );
-    
+
             let image = CLIENT.get(&image_url).send().await?.bytes().await?;
             let verify_code = ddddocr::ddddocr_classification_old()?.classification(&image)?;
-    
+
             if verify_code.len() == VERIFY_CODE_LENGTH {
                 log::info!("Verify code: {}", verify_code);
                 return Ok(verify_code);
             }
         }
-    
+
         Err("Failed to get a verify code with length 4 after 3 attempts".into())
     }
 
