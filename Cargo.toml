@@ -5,7 +5,8 @@ edition = "2021"
 
 [profile.release]
 lto = true
-opt-level = 3
+opt-level = "z"
+strip = true
 panic = "abort"
 codegen-units = 1
 
@@ -16,6 +17,7 @@ log = "0.4.21"
 once_cell = "1.19.0"
 serde_json = "1.0.116"
 thiserror = "1.0.59"
+onnxruntime = "0.0.14"
 
 [dependencies.tokio]
 version = "1.37.0"
@@ -26,10 +28,11 @@ version = "0.12.4"
 features = ["default-tls", "json"]
 default-features = false
 
+[dependencies.image]
+version = "0.25.1"
+features = ["jpeg"]
+default-features = false
+
 [dependencies.simple_logger]
 version = "5.0.0"
 features = ["colors", "timestamps"]
-
-[dependencies.ddddocr]
-git = "https://github.com/86maid/ddddocr.git"
-branch = "master"
