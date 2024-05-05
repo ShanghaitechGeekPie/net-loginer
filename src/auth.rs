@@ -42,7 +42,7 @@ impl Authenticator {
         password: String,
         classifier: Classifier,
     ) -> Result<Self, Box<dyn Error>> {
-        let ip_addresses: Vec<Ipv4Addr> = get_if_addrs()?
+        let ip_addresses = get_if_addrs()?
             .into_iter()
             .filter_map(|if_addr| match if_addr.addr {
                 IfAddr::V4(ipv4) if ipv4.ip.octets()[0] == 10 => Some(ipv4.ip),

@@ -21,8 +21,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     log::info!("Password: {}", password);
 
     let model = include_bytes!("../model/shtu_captcha.onnx");
-    let bytes = include_bytes!("../model/charset.json");
-    let classifier = Classifier::new(model, serde_json::from_slice(bytes)?, [-1, 64], 1)?;
+    let charset = serde_json::from_slice(include_bytes!("../model/charset.json"))?;
+    let classifier = Classifier::new(model, charset, [-1, 64], 1)?;
 
     let authenticator = Authenticator::new(user_id, password, classifier)?;
     authenticator.perform_login().await?;
