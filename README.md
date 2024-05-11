@@ -4,7 +4,13 @@
 
 ## 使用
 
-复制 `.env.example` 到 `.env` 并编辑：
+直接传递环境变量运行：
+
+```bash
+EGATE_ID="2020500100" EGATE_PASSWORD="your_password_here" ./net-loginer
+```
+
+或使用 `.env` 文件：
 
 ```bash
 cp .env.example .env
@@ -14,5 +20,5 @@ vim .env
 运行：
 
 ```bash
-cargo run
+./net-loginer
 ```
