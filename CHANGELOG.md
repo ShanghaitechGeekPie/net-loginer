@@ -1,3 +1,7 @@
+## [0.4.1] - 2024-05-12
+
+- 将 `image` 替换成 `resize` 和 `zune-jpeg` 以减小包体积
+
 ## [0.4.0] - 2024-05-11
 
 - 新增支持多个架构（`x86_64`、`aarch64`）（`Windows`、`Linux`、`macOS`）
@@ -22,6 +26,7 @@
 - Initial release
 - 在 Windows 和 Linux 上通过测试
 
+[0.4.1]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.4.1
 [0.4.0]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.4.0
 [0.3.1]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.3.0

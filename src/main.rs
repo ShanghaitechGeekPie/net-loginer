@@ -1,7 +1,8 @@
 use anyhow::Result;
 use dotenv::dotenv;
 use log::LevelFilter;
-use net_loginer::{Authenticator, Classifier};
+use net_loginer::Authenticator;
+use net_loginer::{Classifier, ModelChannels, ResizeParam};
 use simple_logger::SimpleLogger;
 use std::env;
 
@@ -21,7 +22,9 @@ fn main() -> Result<()> {
 
     let model = include_bytes!("../model/shtu_captcha.onnx");
     let charset = serde_json::from_slice(include_bytes!("../model/charset.json"))?;
-    let classifier = Classifier::new(model, charset, [-1, 64], 1)?;
+
+    let resize_param = ResizeParam::FixedHeight(64);
+    let classifier = Classifier::new(model, charset, resize_param, ModelChannels::Gray)?;
 
     let authenticator = Authenticator::new(user_id, password, classifier)?;
     authenticator.perform_login()?;

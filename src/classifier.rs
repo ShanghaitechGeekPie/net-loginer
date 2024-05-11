@@ -1,11 +1,13 @@
 use anyhow::Result;
-use image::imageops::FilterType;
-use image::EncodableLayout;
 use once_cell::sync::Lazy;
 use onnxruntime::environment::Environment;
 use onnxruntime::session::NdArray;
 use onnxruntime::{ndarray::Array, session::Session};
+use resize::Pixel::RGB8;
+use resize::Type::Lanczos3;
+use rgb::FromSlice;
 use std::sync::Mutex;
+use zune_jpeg::JpegDecoder;
 
 static ENVIRONMENT: Lazy<Environment> = Lazy::new(|| {
     Environment::builder()
@@ -13,19 +15,50 @@ static ENVIRONMENT: Lazy<Environment> = Lazy::new(|| {
         .expect("environment initialization exception!")
 });
 
+#[derive(PartialEq, Copy, Clone)]
+#[repr(u8)]
+pub enum ModelChannels {
+    Gray = 1,
+    RGB = 3,
+}
+
+pub enum ResizeParam {
+    FixedWidth(usize),
+    FixedHeight(usize),
+    FixedSize(usize, usize),
+}
+
+impl ResizeParam {
+    pub fn get_param(&self, image_info: (usize, usize)) -> (usize, usize) {
+        let (origin_width, origin_height) = (image_info.0 as f32, image_info.1 as f32);
+
+        match self {
+            ResizeParam::FixedWidth(width) => {
+                let height = (origin_height * *width as f32 / origin_width).round() as usize;
+                (*width, height)
+            }
+            ResizeParam::FixedHeight(height) => {
+                let width = (origin_width * *height as f32 / origin_height).round() as usize;
+                (width, *height)
+            }
+            ResizeParam::FixedSize(width, height) => (*width, *height),
+        }
+    }
+}
+
 pub struct Classifier {
     session: Mutex<Session<'static>>,
     charset: Vec<String>,
-    resize_param: [i64; 2],
-    channels: usize,
+    resize_param: ResizeParam,
+    channels: ModelChannels,
 }
 
 impl Classifier {
     pub fn new<M: AsRef<[u8]>>(
         model: M,
         charset: Vec<String>,
-        resize_param: [i64; 2],
-        channels: usize,
+        resize_param: ResizeParam,
+        channels: ModelChannels,
     ) -> Result<Self> {
         let session = Mutex::new(
             ENVIRONMENT
@@ -42,45 +75,37 @@ impl Classifier {
     }
 
     pub fn classification<I: AsRef<[u8]>>(&self, image: I) -> Result<String> {
-        let image = {
-            let image = image::load_from_memory(image.as_ref())?;
-            let resize_width = if self.resize_param[0] == -1 {
-                image.width() * self.resize_param[1] as u32 / image.height()
-            } else {
-                self.resize_param[0] as u32
-            };
-            image.resize(
-                resize_width,
-                self.resize_param[1] as u32,
-                FilterType::Lanczos3,
-            )
+        let (image, width, height) = self.resize_image(image)?;
+
+        let image_bytes = match self.channels {
+            ModelChannels::Gray => {
+                let mut gray_image = vec![0; image.len() / 3];
+                for (i, pixels) in image.chunks(3).enumerate() {
+                    let gray = 0.2989 * pixels[0] as f32
+                        + 0.5870 * pixels[1] as f32
+                        + 0.1140 * pixels[2] as f32;
+                    gray_image[i] = gray as u8;
+                }
+                gray_image
+            }
+            ModelChannels::RGB => image,
         };
-
-        let image_bytes = if self.channels == 1 {
-            EncodableLayout::as_bytes(image.to_luma8().as_ref()).to_vec()
-        } else {
-            image.to_rgb8().to_vec()
-        };
-
-        let width = image.width() as usize;
-        let height = image.height() as usize;
-
-        let image_vec = Array::from_shape_vec((self.channels, height, width), image_bytes)?;
 
         let tensor = Array::from_shape_fn(
             (1, self.channels as usize, height, width),
             |(_, c, i, j)| {
-                let now = image_vec[[c as usize, i, j]] as f32;
-                if self.channels == 1 {
-                    ((now / 255f32) - 0.456f32) / 0.224f32
+                let now = image_bytes[(i * width + j) * self.channels as usize + c] as f32;
+                let (mean, std) = if self.channels == ModelChannels::Gray {
+                    (0.456f32, 0.224f32)
                 } else {
                     match c {
-                        0 => ((now / 255f32) - 0.485f32) / 0.229f32,
-                        1 => ((now / 255f32) - 0.456f32) / 0.224f32,
-                        2 => ((now / 255f32) - 0.406f32) / 0.225f32,
+                        0 => (0.485f32, 0.229f32),
+                        1 => (0.456f32, 0.224f32),
+                        2 => (0.406f32, 0.225f32),
                         _ => unreachable!(),
                     }
-                }
+                };
+                ((now / 255f32) - mean) / std
             },
         );
 
@@ -101,5 +126,29 @@ impl Classifier {
             .collect::<String>();
 
         Ok(classification)
+    }
+
+    fn resize_image<I: AsRef<[u8]>>(&self, image: I) -> Result<(Vec<u8>, usize, usize)> {
+        let mut decoder = JpegDecoder::new(image.as_ref());
+        let image = decoder.decode()?;
+        let image_info = decoder.info().unwrap();
+
+        let (resize_width, resize_height) = self
+            .resize_param
+            .get_param((image_info.width as usize, image_info.height as usize));
+
+        let mut resizer = resize::new(
+            image_info.width as usize,
+            image_info.height as usize,
+            resize_width,
+            resize_height,
+            RGB8,
+            Lanczos3,
+        )?;
+
+        let mut resized_image = vec![0; resize_width * resize_height as usize * 3];
+        resizer.resize(&image.as_rgb(), resized_image.as_rgb_mut())?;
+
+        Ok((resized_image, resize_width, resize_height as usize))
     }
 }
