@@ -1,3 +1,8 @@
+## [0.3.1] - 2024-05-10
+
+- 小幅减小模型体积
+- 使用 `ureq` 替换 `reqwest`，进一步减小包体积
+
 ## [0.3.0] - 2024-05-06
 
 - 使用自定义模型大幅减小包体积
@@ -13,5 +18,7 @@
 - Initial release
 - 在 Windows 和 Linux 上通过测试
 
+[0.3.1]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.3.1
+[0.3.0]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.1.0

@@ -1,12 +1,11 @@
+use anyhow::Result;
 use dotenv::dotenv;
 use log::LevelFilter;
 use net_loginer::{Authenticator, Classifier};
 use simple_logger::SimpleLogger;
 use std::env;
-use std::error::Error;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<()> {
     dotenv().ok();
 
     SimpleLogger::new()
@@ -25,7 +24,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let classifier = Classifier::new(model, charset, [-1, 64], 1)?;
 
     let authenticator = Authenticator::new(user_id, password, classifier)?;
-    authenticator.perform_login().await?;
+    authenticator.perform_login()?;
 
     Ok(())
 }

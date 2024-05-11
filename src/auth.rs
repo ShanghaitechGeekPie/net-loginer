@@ -1,15 +1,17 @@
+use anyhow::{anyhow, Result};
 use get_if_addrs::{get_if_addrs, IfAddr};
-use once_cell::sync::Lazy;
-use reqwest::Client;
+use native_tls::TlsConnector;
 use std::collections::HashMap;
 use std::error::Error;
 use std::net::Ipv4Addr;
 use std::str::FromStr;
+use std::sync::Arc;
 use thiserror::Error;
+use ureq::Agent;
+use url::Url;
 
 use crate::classifier::Classifier;
 
-static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const NET_AUTH_BASEURL: &str = "https://net-auth.shanghaitech.edu.cn:19008";
 
 #[derive(Debug, PartialEq)]
@@ -34,14 +36,36 @@ pub struct Authenticator {
     password: String,
     ip_addresses: Vec<Ipv4Addr>,
     classifier: Classifier,
+    client: Agent,
 }
 
 impl Authenticator {
-    pub fn new(
-        user_id: String,
-        password: String,
-        classifier: Classifier,
-    ) -> Result<Self, Box<dyn Error>> {
+    pub fn new(user_id: String, password: String, classifier: Classifier) -> Result<Self> {
+        let client = ureq::AgentBuilder::new()
+            .tls_connector(Arc::new(TlsConnector::new()?))
+            .build();
+        let ip_addresses = Self::get_ip_addresses()?;
+
+        Ok(Self {
+            user_id,
+            password,
+            ip_addresses,
+            classifier,
+            client,
+        })
+    }
+
+    pub fn perform_login(&self) -> Result<()> {
+        for ip_address in &self.ip_addresses {
+            log::info!("Logining for IP address: {}", ip_address);
+            self.login_for_ip(ip_address)?;
+        }
+        Ok(())
+    }
+}
+
+impl Authenticator {
+    fn get_ip_addresses() -> Result<Vec<Ipv4Addr>> {
         let ip_addresses = get_if_addrs()?
             .into_iter()
             .filter_map(|if_addr| match if_addr.addr {
@@ -52,57 +76,46 @@ impl Authenticator {
 
         log::info!("IP addresses: {:?}", ip_addresses);
 
-        Ok(Self {
-            user_id,
-            password,
-            ip_addresses,
-            classifier,
-        })
+        Ok(ip_addresses)
     }
 
-    pub async fn perform_login(&self) -> Result<(), Box<dyn Error>> {
-        for ip_address in &self.ip_addresses {
-            log::info!("Logining for IP address: {}", ip_address);
-            self.login_for_ip(ip_address).await?;
-        }
-        Ok(())
-    }
-}
-
-impl Authenticator {
-    async fn get_verify_code(&self, ip_address: Ipv4Addr) -> Result<String, Box<dyn Error>> {
+    fn get_verify_code(&self, ip_address: Ipv4Addr) -> Result<String> {
         let image_url = format!(
             "{}/portalauth/verificationcode?uaddress={}",
             NET_AUTH_BASEURL, ip_address
         );
 
-        let image = CLIENT.get(&image_url).send().await?.bytes().await?;
+        let mut image = Vec::new();
+        self.client
+            .get(&image_url)
+            .call()?
+            .into_reader()
+            .read_to_end(&mut image)?;
         let verify_code = self.classifier.classification(&image)?;
 
         log::info!("Verify code: {}", verify_code);
         return Ok(verify_code);
     }
 
-    async fn get_page_params(
-        &self,
-        ip_address: Ipv4Addr,
-    ) -> Result<(String, String), Box<dyn Error>> {
+    fn get_page_params(&self, ip_address: Ipv4Addr) -> Result<(String, String)> {
         let verify_url = format!(
             "{}/portal?uaddress={}&ac-ip=0",
             NET_AUTH_BASEURL, ip_address
         );
 
-        let redirected_verify = CLIENT.get(&verify_url).send().await?;
-        let redirected_url = redirected_verify.url();
+        let response = self.client.get(&verify_url).call()?;
+        let final_url = response.get_url().to_string();
+
+        let redirected_url = Url::parse(&final_url)?;
         let query_params: HashMap<_, _> = redirected_url.query_pairs().into_owned().collect();
 
         let push_page_id = query_params
             .get("pushPageId")
-            .ok_or("Cannot find pushPageId in query parameters")?
+            .ok_or(anyhow!("Cannot find pushPageId in query parameters"))?
             .to_string();
         let ssid = query_params
             .get("ssid")
-            .ok_or("Cannot find ssid in query parameters")?
+            .ok_or(anyhow!("Cannot find ssid in query parameters"))?
             .to_string();
 
         log::info!("Get pushPageId: {:?}", push_page_id);
@@ -111,10 +124,7 @@ impl Authenticator {
         Ok((push_page_id, ssid))
     }
 
-    fn parse_auth_result(
-        &self,
-        json_value: &serde_json::Value,
-    ) -> Result<AuthResult, Box<dyn Error>> {
+    fn parse_auth_result(&self, json_value: &serde_json::Value) -> Result<AuthResult> {
         if json_value["success"]
             .as_bool()
             .ok_or(AuthParseError::FieldNotFound("success".to_string()))?
@@ -129,12 +139,9 @@ impl Authenticator {
 
         let response_data = &json_value["data"];
 
-        fn parse_field<T: FromStr>(
-            response_data: &serde_json::Value,
-            field: &str,
-        ) -> Result<T, Box<dyn Error>>
+        fn parse_field<T: FromStr>(response_data: &serde_json::Value, field: &str) -> Result<T>
         where
-            <T as FromStr>::Err: Error + 'static,
+            <T as FromStr>::Err: Error + Send + Sync + 'static,
         {
             let parse_result = response_data[field]
                 .as_str()
@@ -163,32 +170,27 @@ impl Authenticator {
         }
     }
 
-    async fn login_for_ip(&self, ip_address: &Ipv4Addr) -> Result<(), Box<dyn Error>> {
+    fn login_for_ip(&self, ip_address: &Ipv4Addr) -> Result<()> {
         loop {
-            let ((push_page_id, ssid), verify_code) = tokio::try_join!(
-                self.get_page_params(*ip_address),
-                self.get_verify_code(*ip_address)
-            )?;
+            let (push_page_id, ssid) = self.get_page_params(*ip_address)?;
+            let verify_code = self.get_verify_code(*ip_address)?;
 
-            let login_data = serde_json::json!({
-                "userName": self.user_id,
-                "userPass": self.password,
-                "uaddress": ip_address,
-                "validCode": verify_code,
-                "pushPageId": push_page_id,
-                "ssid": ssid,
-                "agreed": "1",
-                "authType": "1",
-            });
-
-            let login_response = CLIENT
+            let json_value = self
+                .client
                 .post(&format!("{}/portalauth/login", NET_AUTH_BASEURL))
-                .form(&login_data)
-                .send()
-                .await?;
+                .send_form(&[
+                    ("userName", &self.user_id),
+                    ("userPass", &self.password),
+                    ("uaddress", &ip_address.to_string()),
+                    ("validCode", &verify_code),
+                    ("pushPageId", &push_page_id),
+                    ("ssid", &ssid),
+                    ("agreed", "1"),
+                    ("authType", "1"),
+                ])?
+                .into_string()?;
 
-            let json_value = login_response.json().await?;
-            let auth_result = self.parse_auth_result(&json_value)?;
+            let auth_result = self.parse_auth_result(&serde_json::from_str(&json_value)?)?;
 
             match auth_result {
                 AuthResult::Success => {
@@ -200,14 +202,14 @@ impl Authenticator {
                 }
                 AuthResult::UserNotFound => {
                     log::warn!("User not found: {}", self.user_id);
-                    return Err("User not found".into());
+                    return Err(anyhow!("User not found"));
                 }
                 AuthResult::UserLocked(remain_lock_time) => {
                     log::warn!(
                         "You are locked. Remaining lock time {} minutes",
                         remain_lock_time
                     );
-                    return Err("User locked".into());
+                    return Err(anyhow!("User locked"));
                 }
                 AuthResult::InvalidPassword(remain_times, lock_time) => {
                     log::warn!(
@@ -215,7 +217,7 @@ impl Authenticator {
                         remain_times,
                         lock_time
                     );
-                    return Err("Invalid password".into());
+                    return Err(anyhow!("Invalid password"));
                 }
             }
         }

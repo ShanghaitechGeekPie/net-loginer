@@ -1,9 +1,9 @@
+use anyhow::Result;
 use image::imageops::FilterType;
 use image::EncodableLayout;
 use once_cell::sync::Lazy;
 use onnxruntime::environment::Environment;
 use onnxruntime::{ndarray::Array, session::Session};
-use std::error::Error;
 use std::sync::Mutex;
 
 static ENVIRONMENT: Lazy<Environment> = Lazy::new(|| {
@@ -25,7 +25,7 @@ impl Classifier {
         charset: Vec<String>,
         resize_param: [i64; 2],
         channels: usize,
-    ) -> Result<Self, Box<dyn Error>> {
+    ) -> Result<Self> {
         let session = Mutex::new(
             ENVIRONMENT
                 .new_session_builder()?
@@ -40,7 +40,7 @@ impl Classifier {
         })
     }
 
-    pub fn classification<I: AsRef<[u8]>>(&self, image: I) -> Result<String, Box<dyn Error>> {
+    pub fn classification<I: AsRef<[u8]>>(&self, image: I) -> Result<String> {
         let image = {
             let origin_image = image::load_from_memory(image.as_ref())?;
             match self.resize_param[0] {
