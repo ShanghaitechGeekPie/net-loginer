@@ -1,3 +1,7 @@
+## [0.4.0] - 2024-05-11
+
+- 新增支持多个架构（`x86_64`、`aarch64`）（`Windows`、`Linux`、`macOS`）
+
 ## [0.3.1] - 2024-05-10
 
 - 小幅减小模型体积
@@ -18,6 +22,7 @@
 - Initial release
 - 在 Windows 和 Linux 上通过测试
 
+[0.4.0]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.4.0
 [0.3.1]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.2.0
