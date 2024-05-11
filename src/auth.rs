@@ -1,14 +1,16 @@
 use anyhow::{anyhow, Result};
 use get_if_addrs::{get_if_addrs, IfAddr};
-use native_tls::TlsConnector;
 use std::collections::HashMap;
 use std::error::Error;
 use std::net::Ipv4Addr;
 use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
-use ureq::Agent;
+use ureq::{Agent, AgentBuilder};
 use url::Url;
+
+#[cfg(feature = "native-tls")]
+use native_tls::TlsConnector;
 
 use crate::classifier::Classifier;
 
@@ -41,9 +43,12 @@ pub struct Authenticator {
 
 impl Authenticator {
     pub fn new(user_id: String, password: String, classifier: Classifier) -> Result<Self> {
-        let client = ureq::AgentBuilder::new()
-            .tls_connector(Arc::new(TlsConnector::new()?))
-            .build();
+        let client = {
+            let builder = AgentBuilder::new();
+            #[cfg(feature = "native-tls")]
+            let builder = builder.tls_connector(Arc::new(TlsConnector::new()?));
+            builder.build()
+        };
         let ip_addresses = Self::get_ip_addresses()?;
 
         Ok(Self {

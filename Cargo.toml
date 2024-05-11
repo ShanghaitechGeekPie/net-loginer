@@ -19,18 +19,16 @@ serde_json = "1.0.116"
 thiserror = "1.0.59"
 anyhow = "1.0.83"
 url = "2.5.0"
-native-tls = "0.2.11"
 jpeg-decoder = "0.3.1"
-
-[dependencies.ureq]
-version = "2.9.7"
-features = ["native-tls"]
-default-features = false
 
 [dependencies.image]
 version = "0.25.1"
 features = ["jpeg"]
 default-features = false
+
+[dependencies.native-tls]
+version = "0.2.8"
+optional = true
 
 [dependencies.simple_logger]
 version = "5.0.0"
@@ -39,3 +37,12 @@ features = ["colors", "timestamps"]
 [dependencies.onnxruntime]
 git = "https://github.com/VOICEVOX/onnxruntime-rs.git"
 branch = "master"
+
+[dependencies.ureq]
+version = "2.9.7"
+default-features = false
+
+[features]
+default = ["native-tls"]
+native-tls = ["ureq/native-tls", "dep:native-tls"]
+rustls = ["ureq/tls"]
