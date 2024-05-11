@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::net::Ipv4Addr;
 use std::str::FromStr;
-use std::sync::Arc;
 use thiserror::Error;
 use ureq::{Agent, AgentBuilder};
 use url::Url;
@@ -46,7 +45,7 @@ impl Authenticator {
         let client = {
             let builder = AgentBuilder::new();
             #[cfg(feature = "native-tls")]
-            let builder = builder.tls_connector(Arc::new(TlsConnector::new()?));
+            let builder = builder.tls_connector(std::sync::Arc::new(TlsConnector::new()?));
             builder.build()
         };
         let ip_addresses = Self::get_ip_addresses()?;
