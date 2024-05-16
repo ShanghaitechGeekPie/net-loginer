@@ -1,3 +1,7 @@
+## [0.4.2] - 2024-05-16
+
+- 验证码错误时不再重复获取 pushPageId 和 ssid
+
 ## [0.4.1] - 2024-05-12
 
 - 将 `image` 替换成 `resize` 和 `zune-jpeg` 以减小包体积
@@ -26,6 +30,7 @@
 - Initial release
 - 在 Windows 和 Linux 上通过测试
 
+[0.4.2]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.4.2
 [0.4.1]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.4.1
 [0.4.0]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.4.0
 [0.3.1]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.3.1

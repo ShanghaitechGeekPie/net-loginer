@@ -78,33 +78,31 @@ impl Classifier {
         let (image, width, height) = self.resize_image(image)?;
 
         let image_bytes = match self.channels {
-            ModelChannels::Gray => {
-                let mut gray_image = vec![0; image.len() / 3];
-                for (i, pixels) in image.chunks(3).enumerate() {
-                    let gray = 0.2989 * pixels[0] as f32
+            ModelChannels::Gray => image
+                .chunks(3)
+                .map(|pixels| {
+                    (0.2989 * pixels[0] as f32
                         + 0.5870 * pixels[1] as f32
-                        + 0.1140 * pixels[2] as f32;
-                    gray_image[i] = gray as u8;
-                }
-                gray_image
-            }
+                        + 0.1140 * pixels[2] as f32) as u8
+                })
+                .collect::<Vec<_>>(),
             ModelChannels::RGB => image,
+        };
+
+        let mean_std = match self.channels {
+            ModelChannels::Gray => vec![(0.456f32, 0.224f32)],
+            ModelChannels::RGB => vec![
+                (0.485f32, 0.229f32),
+                (0.456f32, 0.224f32),
+                (0.406f32, 0.225f32),
+            ],
         };
 
         let tensor = Array::from_shape_fn(
             (1, self.channels as usize, height, width),
             |(_, c, i, j)| {
                 let now = image_bytes[(i * width + j) * self.channels as usize + c] as f32;
-                let (mean, std) = if self.channels == ModelChannels::Gray {
-                    (0.456f32, 0.224f32)
-                } else {
-                    match c {
-                        0 => (0.485f32, 0.229f32),
-                        1 => (0.456f32, 0.224f32),
-                        2 => (0.406f32, 0.225f32),
-                        _ => unreachable!(),
-                    }
-                };
+                let (mean, std) = mean_std[c];
                 ((now / 255f32) - mean) / std
             },
         );

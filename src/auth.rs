@@ -175,8 +175,9 @@ impl Authenticator {
     }
 
     fn login_for_ip(&self, ip_address: &Ipv4Addr) -> Result<()> {
+        let (push_page_id, ssid) = self.get_page_params(*ip_address)?;
+
         loop {
-            let (push_page_id, ssid) = self.get_page_params(*ip_address)?;
             let verify_code = self.get_verify_code(*ip_address)?;
 
             let json_value = self
