@@ -1,3 +1,7 @@
+## [0.5.0] - 2024-09-23
+
+- 真静态编译，不再需要手动安装 `onnxruntime`，体积因此大幅增加
+
 ## [0.4.2] - 2024-05-16
 
 - 验证码错误时不再重复获取 pushPageId 和 ssid
@@ -30,6 +34,7 @@
 - Initial release
 - 在 Windows 和 Linux 上通过测试
 
+[0.5.0]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.5.0
 [0.4.2]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.4.2
 [0.4.1]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.4.1
 [0.4.0]: https://github.com/ShanghaitechGeekPie/net-loginer/releases/tag/v0.4.0

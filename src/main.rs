@@ -1,5 +1,5 @@
 use anyhow::Result;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use log::LevelFilter;
 use net_loginer::Authenticator;
 use net_loginer::{Classifier, ModelChannels, ResizeParam};

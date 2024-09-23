@@ -1,19 +1,10 @@
 use anyhow::Result;
-use once_cell::sync::Lazy;
-use onnxruntime::environment::Environment;
-use onnxruntime::session::NdArray;
-use onnxruntime::{ndarray::Array, session::Session};
+use ndarray::Array;
+use ort::Session;
 use resize::Pixel::RGB8;
 use resize::Type::Lanczos3;
 use rgb::FromSlice;
-use std::sync::Mutex;
 use zune_jpeg::JpegDecoder;
-
-static ENVIRONMENT: Lazy<Environment> = Lazy::new(|| {
-    Environment::builder()
-        .build()
-        .expect("environment initialization exception!")
-});
 
 #[derive(PartialEq, Copy, Clone)]
 #[repr(u8)]
@@ -47,7 +38,7 @@ impl ResizeParam {
 }
 
 pub struct Classifier {
-    session: Mutex<Session<'static>>,
+    session: Session,
     charset: Vec<String>,
     resize_param: ResizeParam,
     channels: ModelChannels,
@@ -60,11 +51,7 @@ impl Classifier {
         resize_param: ResizeParam,
         channels: ModelChannels,
     ) -> Result<Self> {
-        let session = Mutex::new(
-            ENVIRONMENT
-                .new_session_builder()?
-                .with_model_from_memory(model)?,
-        );
+        let session = Session::builder()?.commit_from_memory(model.as_ref())?;
 
         Ok(Self {
             session,
@@ -107,11 +94,11 @@ impl Classifier {
             },
         );
 
-        let mut session = self.session.lock().unwrap();
-        let result = session.run::<i64>(vec![&mut NdArray::new(tensor)])?;
+        let result = self.session.run(ort::inputs![tensor]?)?;
+        let result = result[0].try_extract_tensor::<i64>()?;
 
         let mut last_item = 0;
-        let classification = result[0]
+        let classification = result
             .iter()
             .filter_map(|&value| {
                 if value != 0 && value != last_item {

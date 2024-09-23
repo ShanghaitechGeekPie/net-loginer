@@ -226,6 +226,7 @@ impl Authenticator {
                 }
             }
         }
+
         Ok(())
     }
 }
