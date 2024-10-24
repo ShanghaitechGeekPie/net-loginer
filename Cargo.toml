@@ -14,12 +14,12 @@ codegen-units = 1
 dotenvy = "0.15.7"
 get_if_addrs = "0.5.3"
 log = "0.4.22"
-serde_json = "1.0.128"
-thiserror = "1.0.64"
-anyhow = "1.0.89"
+serde_json = "1.0.132"
+thiserror = "1.0.65"
+anyhow = "1.0.91"
 url = "2.5.2"
 rgb = "0.8.50"
-ort = "2.0.0-rc.6"
+ort = "2.0.0-rc.7"
 ndarray = "0.16.1"
 
 [dependencies.native-tls]
