@@ -5,11 +5,11 @@ use std::error::Error;
 use std::net::Ipv4Addr;
 use std::str::FromStr;
 use thiserror::Error;
-use ureq::{Agent, AgentBuilder};
+use ureq::{Agent, ResponseExt};
 use url::Url;
 
 #[cfg(feature = "native-tls")]
-use native_tls::TlsConnector;
+use ureq::tls::{TlsConfig, TlsProvider};
 
 use crate::classifier::Classifier;
 
@@ -42,12 +42,19 @@ pub struct Authenticator {
 
 impl Authenticator {
     pub fn new(user_id: String, password: String, classifier: Classifier) -> Result<Self> {
-        let client = {
-            let builder = AgentBuilder::new();
-            #[cfg(feature = "native-tls")]
-            let builder = builder.tls_connector(std::sync::Arc::new(TlsConnector::new()?));
-            builder.build()
-        };
+        let tls_config = TlsConfig::builder()
+            .provider(if cfg!(feature = "native-tls") {
+                TlsProvider::NativeTls
+            } else {
+                TlsProvider::Rustls
+            })
+            .build();
+
+        let client = Agent::config_builder()
+            .tls_config(tls_config)
+            .build()
+            .into();
+
         let ip_addresses = Self::get_ip_addresses()?;
 
         Ok(Self {
@@ -89,16 +96,17 @@ impl Authenticator {
             NET_AUTH_BASEURL, ip_address
         );
 
-        let mut image = Vec::new();
-        self.client
+        let image = self
+            .client
             .get(&image_url)
             .call()?
-            .into_reader()
-            .read_to_end(&mut image)?;
-        let verify_code = self.classifier.classification(&image)?;
+            .body_mut()
+            .read_to_vec()?;
 
+        let verify_code = self.classifier.classification(&image)?;
         log::info!("Verify code: {}", verify_code);
-        return Ok(verify_code);
+
+        Ok(verify_code)
     }
 
     fn get_page_params(&self, ip_address: Ipv4Addr) -> Result<(String, String)> {
@@ -108,7 +116,7 @@ impl Authenticator {
         );
 
         let response = self.client.get(&verify_url).call()?;
-        let final_url = response.get_url().to_string();
+        let final_url = response.get_uri().to_string();
 
         let redirected_url = Url::parse(&final_url)?;
         let query_params: HashMap<_, _> = redirected_url.query_pairs().into_owned().collect();
@@ -183,17 +191,18 @@ impl Authenticator {
             let json_value = self
                 .client
                 .post(&format!("{}/portalauth/login", NET_AUTH_BASEURL))
-                .send_form(&[
+                .send_form([
                     ("userName", &self.user_id),
                     ("userPass", &self.password),
                     ("uaddress", &ip_address.to_string()),
                     ("validCode", &verify_code),
                     ("pushPageId", &push_page_id),
                     ("ssid", &ssid),
-                    ("agreed", "1"),
-                    ("authType", "1"),
+                    ("agreed", &String::from("1")),
+                    ("authType", &String::from("1")),
                 ])?
-                .into_string()?;
+                .body_mut()
+                .read_to_string()?;
 
             let auth_result = self.parse_auth_result(&serde_json::from_str(&json_value)?)?;
 

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ndarray::Array;
-use ort::Session;
+use ort::session::Session;
 use resize::Pixel::RGB8;
 use resize::Type::Lanczos3;
 use rgb::FromSlice;
@@ -131,9 +131,9 @@ impl Classifier {
             Lanczos3,
         )?;
 
-        let mut resized_image = vec![0; resize_width * resize_height as usize * 3];
-        resizer.resize(&image.as_rgb(), resized_image.as_rgb_mut())?;
+        let mut resized_image = vec![0; resize_width * resize_height * 3];
+        resizer.resize(image.as_rgb(), resized_image.as_rgb_mut())?;
 
-        Ok((resized_image, resize_width, resize_height as usize))
+        Ok((resized_image, resize_width, resize_height))
     }
 }
